@@ -134,16 +134,35 @@ def _read_csv_from_url(url: str) -> pd.DataFrame:
     print(f"CSV read successfully from URL: {url}")
 
 
+def _read_csv_from_disk(filename: str, dataset_dir: str = "./dspy_hackathon/dataset") -> pd.DataFrame:
+    """Load a CSV from the local dataset directory (default: ./dataset).
+
+    Run `dspy_hackathon/download_pubmed_dataset.py` once to populate the folder
+    with `train.csv` and `test.csv` before calling this function.
+    """
+    path = os.path.join(dataset_dir, filename)
+    print(f"Reading CSV from disk: {path}")
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"CSV not found at {path}. Run `python dspy_hackathon/download_pubmed_dataset.py` "
+            f"to download the PubMed train/test splits into {dataset_dir}/ first."
+        )
+    return pd.read_csv(path)
+
+
 def read_data_and_subset_to_categories() -> tuple[pd.DataFrame]:
     """
     Read the pubmed-text-classification-cased dataset. Docs can be found in the url below:
     https://huggingface.co/datasets/ml4pubmed/pubmed-text-classification-cased/resolve/main/{}.csv
     """
 
-    # Read train/test split
-    file_path = "https://huggingface.co/datasets/ml4pubmed/pubmed-text-classification-cased/resolve/main/{}.csv"
-    train = _read_csv_from_url(file_path.format("train"))
-    test = _read_csv_from_url(file_path.format("test"))
+    # Read train/test split from local disk (run download_pubmed_dataset.py first).
+    # Remote URL fallback retained for reference:
+    # file_path = "https://huggingface.co/datasets/ml4pubmed/pubmed-text-classification-cased/resolve/main/{}.csv"
+    # train = _read_csv_from_url(file_path.format("train"))
+    # test = _read_csv_from_url(file_path.format("test"))
+    train = _read_csv_from_disk("train.csv")
+    test = _read_csv_from_disk("test.csv")
 
     train.drop('description_cln', axis=1, inplace=True)
     test.drop('description_cln', axis=1, inplace=True)
