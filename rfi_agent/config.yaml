@@ -1,0 +1,24 @@
+# Unity catalog location
+catalog: "" 
+schema: "" 
+volume: ""
+table: ""
+eval_table: ""
+
+# Chat/embedding models
+chat_model_name: "system.ai.llama_v3_2_3b_instruct"
+chat_endpoint_name: ""
+
+embedding_model_name: "system.ai.gte_large_en_v1_5"
+embedding_endpoint_name: ""
+
+# Vector search
+vector_search_endpoint: ""
+vector_search_index: ""
+
+# The name of your agent
+agent_name: ""
+
+# Access token
+secret_scope_name : "" # create in advance
+secret_key: "" # create in advance

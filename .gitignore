@@ -1,0 +1,29 @@
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# MLflow local state
+mlruns/
+mlflow.db
+mlflow.db-journal
+
+# DSPy / GEPA run artifacts
+compiled_gepa_*.json
+gepa_*_history.json
+
+# Large Databricks-docs data dumps (contain secrets; not needed for Gemini cookbook)
+rfi_agent/data/databricks_docs_*.jsonl
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
