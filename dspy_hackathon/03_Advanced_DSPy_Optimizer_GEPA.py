@@ -87,11 +87,19 @@ from dotenv import load_dotenv
 from dspy.datasets.dataset import Dataset
 from pandas import StringDtype
 
+from utils import (
+    LARGE_MODEL_CANDIDATES,
+    SMALL_MODEL_CANDIDATES,
+    resolve_gemini_model,
+)
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 # Gemini model ids (LiteLLM). Student = smaller; large = stronger baseline; reflection = GEPA teacher LM.
-small_model = "gemini/gemini-2.5-flash-lite"
-large_model = "gemini/gemini-3.1-pro-preview"
+# Preview models (e.g. "gemini-3.1-pro-preview") may 404 on v1alpha if your API key lacks preview
+# access. The helper below probes each candidate and returns the first that actually responds.
+small_model = resolve_gemini_model(SMALL_MODEL_CANDIDATES, role="small_model")
+large_model = resolve_gemini_model(LARGE_MODEL_CANDIDATES, role="large_model")
 reflection_model = large_model
 
 
@@ -161,6 +169,8 @@ def read_data_and_subset_to_categories() -> tuple[pd.DataFrame]:
     # file_path = "https://huggingface.co/datasets/ml4pubmed/pubmed-text-classification-cased/resolve/main/{}.csv"
     # train = _read_csv_from_url(file_path.format("train"))
     # test = _read_csv_from_url(file_path.format("test"))
+
+    # Previously downloaded to ./dspy_hackathon/dataset/train.csv and ./dspy_hackathon/dataset/
     train = _read_csv_from_disk("train.csv")
     test = _read_csv_from_disk("test.csv")
 
@@ -221,11 +231,15 @@ test_dataset = [example.with_inputs("description") for example in dataset.test]
 print(f"train dataset size: \n {len(train_dataset)}")
 print(f"test dataset size: \n {len(test_dataset)}")
 print(f"Train labels: \n {set([example.target for example in dataset.train])}")
+
 # print the first 5 samples
-print("Sample entries (first 5):")
+print("********* train dataset sample entries (first 5): *********")
 for ex in train_dataset[:5]:
     print(ex)
-
+print("********* test dataset sample entries (first 5): *********")
+for ex in test_dataset[:5]:
+    print(ex)
+print("*************************************************************")
 
 # #Set up the DSPy module and signature for testing 
 
@@ -278,12 +292,14 @@ class TextClassifier(dspy.Module):
 
 # #Let's test that it works
 
-# Initialize classifier with the small Gemini model
-text_classifier = TextClassifier(model=small_model)
+# Initialize classifier with the small and large Gemini models
+small_text_classifier = TextClassifier(model=small_model)
+large_text_classifier = TextClassifier(model=large_model)
 description = "This study is designed as a randomised controlled trial in which men living with HIV in Australia will be assigned to either an intervention group or usual care control group ."
-print(f"Using {small_model} as the model to test the classifier on the text:\n{description}")
-print(f"{text_classifier(description=description)}")
-
+print(f"Using {small_model} as the model to classify the text:\n{description}")
+print(f"{small_text_classifier(description=description)}")
+print(f"Using {large_model} as the model to classify the text:\n{description}")
+print(f"{large_text_classifier(description=description)}")
 
 # #Make an Evaluation Function
 #
@@ -303,7 +319,7 @@ def validate_classification_with_feedback(example, prediction, trace=None, pred_
         ),
     )
 
-def check_accuracy(classifier, test_data: pd.DataFrame = test_dataset) -> float:
+def check_accuracy_on_test_dataset(classifier, test_data: pd.DataFrame = test_dataset) -> float:
     """
     Checks the accuracy of the classifier on the test data.
     """
@@ -316,24 +332,22 @@ def check_accuracy(classifier, test_data: pd.DataFrame = test_dataset) -> float:
     return np.mean(scores)
 
 
-# #Baseline: small vs large Gemini (before GEPA)
+# #Baseline: small vs large Gemini (before GEPA optimization is applied)
 
 # the original prompt for the small model
-baseline = TextClassifier(model=small_model)
-_ = baseline(description=description)  # or any example string
-original_prompt = baseline.lm.history[-1]["messages"][0]["content"]
+baseline_classifier = TextClassifier(model=small_model)
+_ = baseline_classifier(description=description)  # or any example string
+original_prompt = baseline_classifier.lm.history[-1]["messages"][0]["content"]
 print(f"Original prompt for {small_model}: \n{original_prompt}")
 
-uncompiled_small_lm_accuracy = check_accuracy(TextClassifier(model=small_model))
-print(f"Uncompiled {small_model} accuracy: {uncompiled_small_lm_accuracy}")
+uncompiled_small_lm_accuracy = check_accuracy_on_test_dataset(TextClassifier(model=small_model))
+print(f"Uncompiled {small_model} accuracy on test dataset: {uncompiled_small_lm_accuracy}")
 
-uncompiled_large_lm_accuracy = check_accuracy(TextClassifier(model=large_model))
-print(f"Uncompiled {large_model} accuracy: {uncompiled_large_lm_accuracy}")
+uncompiled_large_lm_accuracy = check_accuracy_on_test_dataset(TextClassifier(model=large_model))
+print(f"Uncompiled {large_model} accuracy on test dataset: {uncompiled_large_lm_accuracy}")
 
 
 # ### The smaller model is usually weaker than the larger one; GEPA tries to close that gap on the student model.
-
-
 # #Time to run GEPA
 #
 # With baselines in place, we optimize the student (small Gemini) using the large Gemini as the reflection LM.
@@ -342,7 +356,7 @@ print(f"Uncompiled {large_model} accuracy: {uncompiled_large_lm_accuracy}")
 # 1. GEPA Paper: https://arxiv.org/pdf/2507.19457 
 # 2. DSPy GEPA Tutorials: https://dspy.ai/api/optimizers/GEPA/overview/ 
 
-
+print("Starting GEPA optimization...")
 import uuid
 
 # defining an UUID to identify the optimized module in the MLflow run
@@ -365,17 +379,17 @@ with mlflow.start_run(run_name=f"gepa_{id}"):
     )
 
 compiled_gepa.save(f"compiled_gepa_{id}.json")
-
+print(f"GEPA optimization completed and saved to compiled_gepa_{id}.json")
 
 # #Let's try it again
 #
 # The optimized program is saved as JSON. Reload it on the same small Gemini student and re-evaluate.
 
-
+print("Loading the optimized model and reevaluating accuracy on test dataset...")
 text_classifier_gepa = TextClassifier(model=small_model)
 text_classifier_gepa.load(f"compiled_gepa_{id}.json")
 
-compiled_small_lm_accuracy = check_accuracy(text_classifier_gepa)
+compiled_small_lm_accuracy = check_accuracy_on_test_dataset(text_classifier_gepa)
 print(f"Compiled {small_model} accuracy: {compiled_small_lm_accuracy}")
 
 
