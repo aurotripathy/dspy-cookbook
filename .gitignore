@@ -20,6 +20,10 @@ mlflow.db-journal
 compiled_gepa_*.json
 gepa_*_history.json
 
+# PubMed dataset CSVs (downloaded via download_pubmed_dataset.py)
+dspy_hackathon/dataset/train.csv
+dspy_hackathon/dataset/test.csv
+
 # Large Databricks-docs data dumps (contain secrets; not needed for Gemini cookbook)
 rfi_agent/data/databricks_docs_*.jsonl
 
