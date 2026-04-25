@@ -1,0 +1,17 @@
+# Configuration for 03_Advanced_DSPy_Optimizer_GEPA.{ipynb,py}.
+# Edit values here instead of in the notebook so reruns and CI stay reproducible.
+
+models:
+  # Student we want to optimize (cheap / fast).
+  small: gemini/gemini-2.5-flash-lite
+  # Stronger reference / upper-bound baseline.
+  large: gemini/gemini-3.1-pro-preview
+  # Teacher LM GEPA uses to propose new prompts. Defaults to `large` if null/omitted.
+  reflection: null
+
+dataset:
+  # Per-class sampling sizes for the balanced train/val/test splits.
+  # train + val are sampled (disjointly) from train.csv; test is sampled from test.csv.
+  training_samples_per_label: 3
+  val_samples_per_label: 3
+  test_samples_per_label: 10
