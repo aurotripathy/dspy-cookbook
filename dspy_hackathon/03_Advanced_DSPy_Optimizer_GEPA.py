@@ -86,6 +86,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from dspy.datasets.dataset import Dataset
 from pandas import StringDtype
+from tqdm.auto import tqdm
 
 from utils import (
     LARGE_MODEL_CANDIDATES,
@@ -319,16 +320,18 @@ def validate_classification_with_feedback(example, prediction, trace=None, pred_
         ),
     )
 
-def check_accuracy_on_test_dataset(classifier, test_data: pd.DataFrame = test_dataset) -> float:
+def check_accuracy_on_test_dataset(classifier, test_data: pd.DataFrame = test_dataset, desc: str = "Evaluating") -> float:
     """
     Checks the accuracy of the classifier on the test data.
     """
     scores = []
-    for example in test_data:
+    progress = tqdm(test_data, desc=desc, unit="ex")
+    for example in progress:
         prediction = classifier(description=example["description"])
         score = validate_classification_with_feedback(example, prediction).score
         scores.append(score)
-        
+        progress.set_postfix(acc=f"{np.mean(scores):.3f}")
+
     return np.mean(scores)
 
 
@@ -340,10 +343,14 @@ _ = baseline_classifier(description=description)  # or any example string
 original_prompt = baseline_classifier.lm.history[-1]["messages"][0]["content"]
 print(f"Original prompt for {small_model}: \n{original_prompt}")
 
-uncompiled_small_lm_accuracy = check_accuracy_on_test_dataset(TextClassifier(model=small_model))
+uncompiled_small_lm_accuracy = check_accuracy_on_test_dataset(
+    TextClassifier(model=small_model), desc=f"Uncompiled {small_model}"
+)
 print(f"Uncompiled {small_model} accuracy on test dataset: {uncompiled_small_lm_accuracy}")
 
-uncompiled_large_lm_accuracy = check_accuracy_on_test_dataset(TextClassifier(model=large_model))
+uncompiled_large_lm_accuracy = check_accuracy_on_test_dataset(
+    TextClassifier(model=large_model), desc=f"Uncompiled {large_model}"
+)
 print(f"Uncompiled {large_model} accuracy on test dataset: {uncompiled_large_lm_accuracy}")
 
 
@@ -389,7 +396,9 @@ print("Loading the optimized model and reevaluating accuracy on test dataset..."
 text_classifier_gepa = TextClassifier(model=small_model)
 text_classifier_gepa.load(f"compiled_gepa_{id}.json")
 
-compiled_small_lm_accuracy = check_accuracy_on_test_dataset(text_classifier_gepa)
+compiled_small_lm_accuracy = check_accuracy_on_test_dataset(
+    text_classifier_gepa, desc=f"GEPA-compiled {small_model}"
+)
 print(f"Compiled {small_model} accuracy: {compiled_small_lm_accuracy}")
 
 
