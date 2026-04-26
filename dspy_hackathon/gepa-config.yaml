@@ -15,3 +15,18 @@ dataset:
   training_samples_per_label: 3
   val_samples_per_label: 3
   test_samples_per_label: 10
+
+gepa:
+  # Pre-set budget. One of "light" | "medium" | "heavy" (or pass max_metric_calls instead).
+  auto: light
+  # How many examples to show the reflection LM per prompt-rewrite proposal.
+  # null → defaults to len(train_dataset) at runtime.
+  reflection_minibatch_size: null
+  # Token budget for each reflection-LM call (the teacher that rewrites prompts).
+  reflection_lm_max_tokens: 100000
+  # Parallelism for metric evaluation across candidates.
+  num_threads: 16
+  # RNG seed for reproducibility of GEPA's search.
+  seed: 1
+  # Populate compiled_gepa.detailed_results so the Pareto-frontier plot has data.
+  track_stats: true
